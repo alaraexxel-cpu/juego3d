@@ -42,6 +42,7 @@
         canvas {
             background: #1e293b;
             box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+            display: block;
         }
         .screen {
             position: absolute;
@@ -128,41 +129,52 @@
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
 
-        // Ajustar tamaño del lienzo al dispositivo móvil
+        // Ajustar tamaño al dispositivo móvil
         canvas.width = Math.min(window.innerWidth, 450);
         canvas.height = window.innerHeight;
 
-        let jugador = { x: canvas.width / 2, y: canvas.height - 100, r: 12, speed: 7 };
+        let jugador = { x: canvas.width / 2, y: canvas.height - 150, r: 12 };
         let juegoActivo = false;
         let misionActual = 1;
         let progreso = 0;
         let obstaculos = [];
         let frames = 0;
 
-        // Configuración estética e histórica por nivel basada en tus imágenes
+        // Configuración estética de las misiones basada en tus imágenes
         const configMisiones = {
-            1: { nombre: "El Sendero Empedrado", fondo: "#132515", obstaculoColor: "#2e1f10", freq: 40, desc: "Ramas y árboles en las orillas." },
-            2: { nombre: "Los Puentes Colgantes", fondo: "#0d1b2a", obstaculoColor: "#7e5a3c", freq: 35, desc: "Plataformas estrechas y cuerdas flotantes." },
-            3: { nombre: "Árboles Caídos", fondo: "#1c251d", obstaculoColor: "#4a3b32", freq: 30, desc: "Troncos masivos caídos en medio de la vía." },
-            4: { nombre: "Zona de Riesgo Eléctrico", fondo: "#242424", obstaculoColor: "#1a1a1a", freq: 25, desc: "Postes doblados y marañas de cables." },
-            5: { nombre: "La Cueva de Rocas", fondo: "#111318", obstaculoColor: "#334155", freq: 20, desc: "Derrumbes de piedra a alta velocidad." }
+            1: { nombre: "El Sendero Empedrado", fondo: "#132515", obstaculoColor: "#2e1f10", freq: 40 },
+            2: { nombre: "Los Puentes Colgantes", fondo: "#0d1b2a", obstaculoColor: "#7e5a3c", freq: 35 },
+            3: { nombre: "Árboles Caídos", fondo: "#1c251d", obstaculoColor: "#4a3b32", freq: 30 },
+            4: { nombre: "Zona de Riesgo Eléctrico", fondo: "#242424", obstaculoColor: "#1a1a1a", freq: 25 },
+            5: { nombre: "La Cueva de Rocas", fondo: "#111318", obstaculoColor: "#334155", freq: 20 }
         };
 
-        // Capturar controles táctiles
+        // Capturar controles táctiles sin retraso ni bloqueos de navegador
+        window.addEventListener('touchstart', (e) => {
+            if (!juegoActivo) return;
+            e.preventDefault();
+        }, { passive: false });
+
         window.addEventListener('touchmove', (e) => {
             if (!juegoActivo) return;
+            e.preventDefault();
+            
             let touch = e.touches[0];
             let rect = canvas.getBoundingClientRect();
             let touchX = touch.clientX - rect.left;
-            // Movimiento directo suavizado hacia donde el dedo apunte en la pantalla
-            jugador.x += (touchX - jugador.x) * 0.3;
-            // Limitar los bordes
+            
+            jugador.x = touchX;
+            
             if (jugador.x < jugador.r) jugador.x = jugador.r;
             if (jugador.x > canvas.width - jugador.r) jugador.x = canvas.width - jugador.r;
-        });
+        }, { passive: false });
 
         function iniciarJuego() {
             document.getElementById('start-screen').style.display = 'none';
+            progreso = 0;
+            misionActual = 1;
+            obstaculos = [];
+            jugador.x = canvas.width / 2;
             juegoActivo = true;
             loop();
         }
@@ -173,6 +185,7 @@
             obstaculos = [];
             jugador.x = canvas.width / 2;
             juegoActivo = true;
+            loop();
         }
 
         function terminarJuego() {
@@ -184,20 +197,20 @@
             frames++;
             let config = configMisiones[misionActual];
             if (frames % config.freq === 0) {
-                let anchoObstaculo = Math.random() * (canvas.width * 0.4) + 40;
+                let anchoObstaculo = Math.random() * (canvas.width * 0.35) + 40;
                 let posX = Math.random() * (canvas.width - anchoObstaculo);
                 obstaculos.push({
                     x: posX,
                     y: -40,
                     w: anchoObstaculo,
-                    h: 25,
-                    speed: 5 + (misionActual * 0.8)
+                    h: 20,
+                    speed: 4 + (misionActual * 0.7)
                 });
             }
         }
 
         function actualizar() {
-            progreso += 0.1;
+            progreso += 0.08;
             document.getElementById('hud-progreso').innerText = `Progreso: ${Math.floor(progreso)}%`;
             document.getElementById('hud-mision').innerText = `Misión: ${misionActual}/5`;
 
@@ -208,6 +221,7 @@
                     obstaculos = [];
                 } else {
                     terminarJuego();
+                    return;
                 }
             }
 
@@ -216,7 +230,6 @@
             for (let i = obstaculos.length - 1; i >= 0; i--) {
                 obstaculos[i].y += obstaculos[i].speed;
 
-                // Detección de colisión (Caja vs Círculo)
                 let ob = obstaculos[i];
                 let closestX = Math.max(ob.x, Math.min(jugador.x, ob.x + ob.w));
                 let closestY = Math.max(ob.y, Math.min(jugador.y, ob.y + ob.h));
@@ -226,8 +239,9 @@
 
                 if (distanceSquared < (jugador.r * jugador.r)) {
                     juegoActivo = false;
-                    document.getElementById('motivo-fallo').innerText = `Te topaste con un obstáculo en: ${configMisiones[misionActual].nombre}.`;
+                    document.getElementById('motivo-fallo').innerText = `Chocaste en la Misión ${misionActual}: ${configMisiones[misionActual].nombre}.`;
                     document.getElementById('gameover-screen').style.display = 'flex';
+                    return;
                 }
 
                 if (ob.y > canvas.height) {
@@ -240,34 +254,32 @@
             let config = configMisiones[misionActual];
             ctx.fillStyle = config.fondo;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  // Dibujar las líneas del camino lateral decorativo
-ctx.strokeStyle = "rgba(255,255,255,0.05)";
-ctx.lineWidth = 4;
-ctx.beginPath();
-ctx.moveTo(30, 0); ctx.lineTo(30, canvas.height);
-ctx.moveTo(canvas.width - 30, 0); ctx.lineTo(canvas.width - 30, canvas.height);
-ctx.stroke();
-// Dibujar obstáculos con relieve de sombra
-ctx.fillStyle = config.obstaculoColor;
+// Márgenes del camino
+ctx.fillStyle = "rgba(0, 0, 0, 0.2)";
+ctx.fillRect(0, 0, 20, canvas.height);
+ctx.fillRect(canvas.width - 20, 0, 20, canvas.height);
+// Dibujar troncos/obstáculos
 for (let ob of obstaculos) {
-ctx.fillRect(ob.x, ob.y, ob.w, ob.h);
-ctx.fillStyle = "rgba(0,0,0,0.2)";
-ctx.fillRect(ob.x, ob.y + ob.h - 5, ob.w, 5); // Sombra del objeto
 ctx.fillStyle = config.obstaculoColor;
+ctx.fillRect(ob.x, ob.y, ob.w, ob.h);
+ctx.fillStyle = "rgba(0,0,0,0.3)";
+ctx.fillRect(ob.x, ob.y + ob.h - 4, ob.w, 4);
 }
-// Dibujar el punto del jugador (Esfera brillante de energía ALR)
-ctx.shadowBlur = 15;
-ctx.shadowColor = "#00ff66";
-ctx.fillStyle = "#ffffff";
+// Esfera brillante ALR
+ctx.fillStyle = "#00ff66";
 ctx.beginPath();
 ctx.arc(jugador.x, jugador.y, jugador.r, 0, Math.PI * 2);
 ctx.fill();
-ctx.shadowBlur = 0; // Resetear sombras para rendimiento
+ctx.fillStyle = "#ffffff";
+ctx.beginPath();
+ctx.arc(jugador.x, jugador.y, jugador.r / 2, 0, Math.PI * 2);
+ctx.fill();
 }
 function loop() {
 if (!juegoActivo) return;
 actualizar();
 dibujar();
 requestAnimationFrame(loop);
-      }
+        }
+        
+        
