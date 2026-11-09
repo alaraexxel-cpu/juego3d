@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-select=none">
+    <title>ALR NATURE ADVENTURE</title>
+    <script src="https://telegram.org"></script>
+    <style>
+        body {
+            background-color: #090c10;
+            color: #00ff66;
+            font-family: monospace;
+            text-align: center;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        #hud {
+            position: absolute;
+            top: 10px;
+            width: 90%;
+            display: flex;
+            justify-content: space-between;
+            font-size: 16px;
+            font-weight: bold;
+            background: rgba(15, 23, 42, 0.8);
+            padding: 8px 15px;
+            border-radius: 8px;
+            border: 1px solid #00ff66;
+            box-shadow: 0 0 10px rgba(0, 255, 102, 0.2);
+            z-index: 10;
+        }
+        canvas {
+            background: #1e293b;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+        }
+        .screen {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(9, 12, 16, 0.95);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 20;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        button {
+            background: #00ff66;
+            color: #090c10;
+            border: none;
+            padding: 12px 30px;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-top: 15px;
+            box-shadow: 0 4px 10px rgba(0, 255, 102, 0.3);
+        }
+        button:active { transform: scale(0.95); }
+        input[type="email"], input[type="text"] {
+            width: 80%; padding: 12px; margin: 10px 0;
+            border-radius: 8px; border: 1px solid #1f2430;
+            background: #0b0e14; color: #fff; text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <!-- HUD Superior -->
+        <div id="hud">
+            <div id="hud-mision">Misión: 1/5</div>
+            <div id="hud-progreso">Progreso: 0%</div>
+        </div>
+
+        <!-- Pantalla de Inicio -->
+        <div id="start-screen" class="screen">
+            <h1 style="font-size: 28px; margin-bottom: 5px;">🌲 ALR NATURE QUEST 🌲</h1>
+            <p style="color: #abb2bf; max-width: 300px; font-size: 14px;">Esquiva las trampas, cruza los puentes colgantes y supera los árboles caídos del camino para ganar.</p>
+            <button onclick="iniciarJuego()">Iniciar Aventura</button>
+        </div>
+
+        <!-- Pantalla de Fin de Juego (Derrota) -->
+        <div id="gameover-screen" class="screen" style="display: none;">
+            <h2 style="color: #ff3333;">💥 ¡Chocaste contra un obstáculo!</h2>
+            <p id="motivo-fallo" style="color: #abb2bf; font-size:14px;"></p>
+            <button onclick="reiniciarNivel()">Reintentar Misión</button>
+        </div>
+
+        <!-- Pantalla de Éxito Final (PayPal) -->
+        <div id="victory-screen" class="screen" style="display: none;">
+            <!-- REEMPLAZA EL ACTION CON TU LINK DE FORMSPREE -->
+            <form action="https://formspree.io" method="POST" style="width: 100%; display: flex; flex-direction: column; align-items: center;">
+                <h2 style="color: #00ff66;">🎉 ¡AVENTURA COMPLETADA! 🎉</h2>
+                <p style="color: #abb2bf; font-size: 14px; max-width: 300px;">Has superado los 5 niveles del bosque. Introduce tus datos de cobro:</p>
+                <input type="text" name="Jugador" id="tg-username" readonly style="color: #565f73;">
+                <input type="email" name="Paypal" placeholder="Tu correo electrónico de PayPal" required>
+                <input type="hidden" name="Logro" value="Superó legítimamente las 5 misiones físicas de aventura.">
+                <button type="submit" style="background: #fff;">Enviar para Pago Directo</button>
+            </form>
+        </div>
+
+        <!-- Canvas del Videojuego -->
+        <canvas id="gameCanvas"></canvas>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+
+        if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+            document.getElementById('tg-username').value = `@${tg.initDataUnsafe.user.username || tg.initDataUnsafe.user.first_name}`;
+        } else {
+            document.getElementById('tg-username').value = "Aventurero_Web";
+        }
+
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Ajustar tamaño del lienzo al dispositivo móvil
+        canvas.width = Math.min(window.innerWidth, 450);
+        canvas.height = window.innerHeight;
+
+        let jugador = { x: canvas.width / 2, y: canvas.height - 100, r: 12, speed: 7 };
+        let juegoActivo = false;
+        let misionActual = 1;
+        let progreso = 0;
+        let obstaculos = [];
+        let frames = 0;
+
+        // Configuración estética e histórica por nivel basada en tus imágenes
+        const configMisiones = {
+            1: { nombre: "El Sendero Empedrado", fondo: "#132515", obstaculoColor: "#2e1f10", freq: 40, desc: "Ramas y árboles en las orillas." },
+            2: { nombre: "Los Puentes Colgantes", fondo: "#0d1b2a", obstaculoColor: "#7e5a3c", freq: 35, desc: "Plataformas estrechas y cuerdas flotantes." },
+            3: { nombre: "Árboles Caídos", fondo: "#1c251d", obstaculoColor: "#4a3b32", freq: 30, desc: "Troncos masivos caídos en medio de la vía." },
+            4: { nombre: "Zona de Riesgo Eléctrico", fondo: "#242424", obstaculoColor: "#1a1a1a", freq: 25, desc: "Postes doblados y marañas de cables." },
+            5: { nombre: "La Cueva de Rocas", fondo: "#111318", obstaculoColor: "#334155", freq: 20, desc: "Derrumbes de piedra a alta velocidad." }
+        };
+
+        // Capturar controles táctiles
+        window.addEventListener('touchmove', (e) => {
+            if (!juegoActivo) return;
+            let touch = e.touches[0];
+            let rect = canvas.getBoundingClientRect();
+            let touchX = touch.clientX - rect.left;
+            // Movimiento directo suavizado hacia donde el dedo apunte en la pantalla
+            jugador.x += (touchX - jugador.x) * 0.3;
+            // Limitar los bordes
+            if (jugador.x < jugador.r) jugador.x = jugador.r;
+            if (jugador.x > canvas.width - jugador.r) jugador.x = canvas.width - jugador.r;
+        });
+
+        function iniciarJuego() {
+            document.getElementById('start-screen').style.display = 'none';
+            juegoActivo = true;
+            loop();
+        }
+
+        function reiniciarNivel() {
+            document.getElementById('gameover-screen').style.display = 'none';
+            progreso = 0;
+            obstaculos = [];
+            jugador.x = canvas.width / 2;
+            juegoActivo = true;
+        }
+
+        function terminarJuego() {
+            juegoActivo = false;
+            document.getElementById('victory-screen').style.display = 'flex';
+        }
+
+        function generarObstaculos() {
+            frames++;
+            let config = configMisiones[misionActual];
+            if (frames % config.freq === 0) {
+                let anchoObstaculo = Math.random() * (canvas.width * 0.4) + 40;
+                let posX = Math.random() * (canvas.width - anchoObstaculo);
+                obstaculos.push({
+                    x: posX,
+                    y: -40,
+                    w: anchoObstaculo,
+                    h: 25,
+                    speed: 5 + (misionActual * 0.8)
+                });
+            }
+        }
+
+        function actualizar() {
+            progreso += 0.1;
+            document.getElementById('hud-progreso').innerText = `Progreso: ${Math.floor(progreso)}%`;
+            document.getElementById('hud-mision').innerText = `Misión: ${misionActual}/5`;
+
+            if (progreso >= 100) {
+                if (misionActual < 5) {
+                    misionActual++;
+                    progreso = 0;
+                    obstaculos = [];
+                } else {
+                    terminarJuego();
+                }
+            }
+
+            generarObstaculos();
+
+            for (let i = obstaculos.length - 1; i >= 0; i--) {
+                obstaculos[i].y += obstaculos[i].speed;
+
+                // Detección de colisión (Caja vs Círculo)
+                let ob = obstaculos[i];
+                let closestX = Math.max(ob.x, Math.min(jugador.x, ob.x + ob.w));
+                let closestY = Math.max(ob.y, Math.min(jugador.y, ob.y + ob.h));
+                let distanceX = jugador.x - closestX;
+                let distanceY = jugador.y - closestY;
+                let distanceSquared = (distanceX * distanceX) + (distanceY * distanceY);
+
+                if (distanceSquared < (jugador.r * jugador.r)) {
+                    juegoActivo = false;
+                    document.getElementById('motivo-fallo').innerText = `Te topaste con un obstáculo en: ${configMisiones[misionActual].nombre}.`;
+                    document.getElementById('gameover-screen').style.display = 'flex';
+                }
+
+                if (ob.y > canvas.height) {
+                    obstaculos.splice(i, 1);
+                }
+            }
+        }
+
+        function dibujar() {
+            let config = configMisiones[misionActual];
+            ctx.fillStyle = config.fondo;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Dibujar las líneas del camino lateral decorativo
+ctx.strokeStyle = "rgba(255,255,255,0.05)";
+ctx.lineWidth = 4;
+ctx.beginPath();
+ctx.moveTo(30, 0); ctx.lineTo(30, canvas.height);
+ctx.moveTo(canvas.width - 30, 0); ctx.lineTo(canvas.width - 30, canvas.height);
+ctx.stroke();
+// Dibujar obstáculos con relieve de sombra
+ctx.fillStyle = config.obstaculoColor;
+for (let ob of obstaculos) {
+ctx.fillRect(ob.x, ob.y, ob.w, ob.h);
+ctx.fillStyle = "rgba(0,0,0,0.2)";
+ctx.fillRect(ob.x, ob.y + ob.h - 5, ob.w, 5); // Sombra del objeto
+ctx.fillStyle = config.obstaculoColor;
+}
+// Dibujar el punto del jugador (Esfera brillante de energía ALR)
+ctx.shadowBlur = 15;
+ctx.shadowColor = "#00ff66";
+ctx.fillStyle = "#ffffff";
+ctx.beginPath();
+ctx.arc(jugador.x, jugador.y, jugador.r, 0, Math.PI * 2);
+ctx.fill();
+ctx.shadowBlur = 0; // Resetear sombras para rendimiento
+}
+function loop() {
+if (!juegoActivo) return;
+actualizar();
+dibujar();
+requestAnimationFrame(loop);
+      }
