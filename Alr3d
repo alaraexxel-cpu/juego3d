@@ -1,0 +1,95 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Imperio Chino Isométrico</title>
+    <style>
+        body { margin: 0; background: #111; text-align: center; color: white; font-family: sans-serif; overflow: hidden; user-select: none; }
+        h3 { margin: 10px 0; font-size: 18px; color: #ffd700; text-shadow: 1px 1px 3px #000; }
+
+        /* El escenario inclinado para dar la sensación de falso 3D (Perspectiva) */
+        #contenedor-3d { width: 90vw; height: 50vh; margin: 0 auto; border: 3px solid #ffd700; border-radius: 10px; background: #222; overflow: hidden; position: relative; perspective: 400px; }
+        #suelo-3d { width: 100%; height: 100%; background: #2e7d32; position: absolute; transform: rotateX(45deg); transform-origin: bottom; box-shadow: inset 0 0 50px rgba(0,0,0,0.6); }
+
+        /* Personaje con relieve flotante */
+        #personaje { width: 50px; height: 50px; position: absolute; border-radius: 50%; border: 2px solid #ffd700; box-shadow: 0 15px 10px rgba(0,0,0,0.5); object-fit: cover; z-index: 10; }
+
+        /* Elementos del mapa para notar la profundidad visual */
+        .estructura-3d { position: absolute; background: #8b5a2b; border: 2px solid #5c3a1a; box-shadow: 0 10px 10px rgba(0,0,0,0.4); }
+        #templo { width: 60px; height: 60px; top: 20%; left: 70%; background: #b22222; border-color: #7f1a1a; }
+        #roca { width: 40px; height: 40px; top: 50%; left: 20%; background: #555; border-color: #333; border-radius: 8px; }
+
+        .control-pad { display: grid; grid-template-columns: repeat(3, 80px); grid-template-rows: repeat(3, 80px); gap: 15px; justify-content: center; margin-top: 25px; }
+        .btn-control { background: #333; color: white; border: 2px solid #555; border-radius: 20px; font-size: 28px; display: flex; align-items: center; justify-content: center; -webkit-user-select: none; }
+        .btn-control:active { background: #666; }
+        #btn-arriba { grid-column: 2; grid-row: 1; }
+        #btn-izquierda { grid-column: 1; grid-row: 2; }
+        #btn-abajo { grid-column: 2; grid-row: 3; }
+        #btn-derecha { grid-column: 3; grid-row: 2; }
+    </style>
+</head>
+<body>
+
+    <h3>⛩️ Senda Imperial 2.5D ⛩️</h3>
+
+    <div id="contenedor-3d">
+        <!-- El suelo inclinado en perspectiva hacia el fondo -->
+        <div id="suelo-3d"></div>
+
+        <!-- Obstáculos con sombras para dar volumen -->
+        <div class="estructura-3d" id="templo"></div>
+        <div class="estructura-3d" id="roca"></div>
+
+        <!-- Tu guerrera enmascarada -->
+        <img id="personaje" src="https://ibb.co" alt="Guerrera">
+    </div>
+
+    <div class="control-pad">
+        <div class="btn-control" id="btn-arriba" ontouchstart="iniciarMov('arriba')" ontouchend="detenerMov()" mousedown="iniciarMov('arriba')" mouseup="detenerMov()">⬆️</div>
+        <div class="btn-control" id="btn-izquierda" ontouchstart="iniciarMov('izquierda')" ontouchend="detenerMov()" mousedown="iniciarMov('izquierda')" mouseup="detenerMov()">⬅️</div>
+        <div class="btn-control" id="btn-abajo" ontouchstart="iniciarMov('abajo')" ontouchend="detenerMov()" mousedown="iniciarMov('abajo')" mouseup="detenerMov()">⬇️</div>
+        <div class="btn-control" id="btn-derecha" ontouchstart="iniciarMov('derecha')" ontouchend="detenerMov()" mousedown="iniciarMov('derecha')" mouseup="detenerMov()">➡️</div>
+    </div>
+
+    <script>
+        let posX = 120;
+        let posY = 120;
+        let intervalo = null;
+        let dir = null;
+
+        const p = document.getElementById('personaje');
+        const cont = document.getElementById('contenedor-3d');
+
+        const velocidad = 5;
+
+        function actualizarPosicion() {
+            if (!dir) return;
+
+            const limiteX = cont.clientWidth - 55;
+            const limiteY = cont.clientHeight - 55;
+
+            if (dir === 'arriba' && posY > 10) posY -= velocidad;
+            if (dir === 'abajo' && posY < limiteY) posY += velocidad;
+            if (dir === 'izquierda' && posX > 10) posX -= velocidad;
+            if (dir === 'derecha' && posX < limiteX) posX += velocidad;
+
+            p.style.left = posX + 'px';
+            p.style.top = posY + 'px';
+        }
+
+        function iniciarMov(direccion) {
+            if (intervalo) return;
+            dir = direccion;
+            intervalo = setInterval(actualizarPosicion, 16);
+        }
+
+        function detenerMov() {
+            clearInterval(intervalo);
+            intervalo = null;
+            dir = null;
+        }
+    </script>
+</body>
+</html>
